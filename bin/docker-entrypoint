@@ -1,5 +1,11 @@
 #!/bin/bash -e
 
+# Railway injects PORT: let Thruster listen on it and proxy to Puma on 3000
+if [ -n "${PORT}" ]; then
+  export HTTP_PORT="${PORT}" TARGET_PORT=3000
+  unset PORT
+fi
+
 # If running the rails server then create or migrate existing database
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   ./bin/rails db:prepare
