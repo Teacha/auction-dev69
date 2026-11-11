@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "Shopify.ruby-lsp",
+    "GitHub.vscode-pull-request-github",
+    "eamodio.gitlens",
+    "aliariff.vscode-erb-beautify",
+    "bradlc.vscode-tailwindcss",
+    "ckolkman.vscode-postgres",
+    "EditorConfig.EditorConfig"
+  ]
+}
