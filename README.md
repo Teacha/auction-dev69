@@ -1,49 +1,95 @@
-# Auction Project — devpool69
+# auction-dev69 — ระบบประมูลสินค้าสะสม
 
-ระบบประมูลออนไลน์ด้วย **Ruby on Rails 8.1** + **PostgreSQL 17** + Hotwire (Turbo/Stimulus) + Tailwind CSS
+ระบบประมูลออนไลน์สำหรับสินค้าสะสม 4 ประเภท: **นาฬิกา, เครื่องประดับ, หนังสือเก่า, ภาพวาด**
 
-- แผนงานและ milestone: [docs/ROADMAP.md](docs/ROADMAP.md)
-- วิธีทำงานร่วมกัน (branch, PR, label): [CONTRIBUTING.md](CONTRIBUTING.md)
+- ผู้ใช้ 1 บัญชีเป็นได้ทั้ง **ผู้ขาย** และ **ผู้ประมูล**
+- **Admin** ตรวจสอบและอนุมัติสินค้า แล้วนำไปจัดประมูล
+- วิธีประมูลแรก: **FPSBA** (First-Price Sealed-Bid Auction) — อนาคตรองรับ English, Vickrey, Dutch
+- เป้าหมาย: ขึ้น MVP ให้เร็วที่สุดเพื่อเก็บ feedback (Agile/Scrum, Sprint ละ 1 วัน)
 
-## เริ่มต้นใช้งาน (macOS)
+## Tech stack
 
-### 1. ติดตั้งเครื่องมือ (ครั้งแรกครั้งเดียว)
+| ส่วน | เทคโนโลยี |
+|---|---|
+| Language / Framework | Ruby 4.0.9, Rails 8.1 |
+| Database | PostgreSQL 17 |
+| Authentication | Devise + `omniauth_openid_connect` → **Keycloak** (ไม่มี password ในระบบ) |
+| Authorization | `User#role` enum: `user`, `admin` |
+| Frontend | Hotwire (Turbo/Stimulus) + Tailwind CSS |
+| Background jobs | Solid Queue (`SOLID_QUEUE_IN_PUMA=true` บน Railway) |
+| File storage | Active Storage + S3-compatible storage |
+| Test / Lint / Security | RSpec, FactoryBot, shoulda-matchers / RuboCop (omakase + rspec) / Brakeman, bundler-audit |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) |
+| Deploy | [Railway](https://railway.com/) (app + PostgreSQL) |
+
+## Setup เครื่อง (local development)
+
+ต้องมี: [mise](https://mise.jdx.dev/) (หรือ rbenv/asdf), PostgreSQL 17 (Docker หรือ Homebrew), libvips, libpq
+
 ```bash
-# Ruby (ใช้ mise, rbenv หรือ asdf ก็ได้ — เวอร์ชันอยู่ใน .ruby-version)
-brew install mise && mise install ruby@3.4.12
+# 1. Ruby ตาม .ruby-version
+mise install ruby@4.0.9 && mise use ruby@4.0.9
 
-# PostgreSQL
-brew install postgresql@17
-brew services start postgresql@17
-echo 'export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"' >> ~/.zshrc
+# 2. PostgreSQL สำหรับ dev
+docker compose up -d db                 # แบบ Docker (port 5432, postgres/postgres)
+# หรือ macOS: brew install postgresql@17 && brew services start postgresql@17
+#   แล้วปล่อย DB_HOST/DB_USERNAME/DB_PASSWORD ใน .env ว่าง (ใช้ unix socket)
+
+# 3. Environment variables — ห้าม commit .env
+cp .env.example .env
+# ใส่ค่า KEYCLOAK_* ของ dev realm
+# ขอ config/master.key จากหัวหน้าทีมทางช่องทางส่วนตัว (ห้าม commit)
+
+# 4. ติดตั้ง gem, สร้าง database, start server
+bin/setup
 ```
 
-### 2. Clone และ setup
-```bash
-git clone https://github.com/carbonformevent-stack/auction-dev69.git
-cd auction-dev69
-code .                      # เปิดใน VSCode → กด Install ส่วนขยายที่แนะนำ
-```
-ขอไฟล์ `config/master.key` จากหัวหน้าทีม (ส่งทางช่องทางส่วนตัว **ห้าม commit**) แล้ววางไว้ที่ `config/master.key`
+เปิด http://localhost:3000 แล้วกด "เข้าสู่ระบบ" ระบบจะพาไป Keycloak
+
+### ตั้ง Keycloak client (dev)
+
+- Client type: OpenID Connect, Client authentication: **On** (confidential)
+- Valid redirect URIs: `http://localhost:3000/users/auth/keycloak/callback`
+- Valid post logout redirect URIs: `http://localhost:3000/*`
+- ใส่ค่าใน `.env`: `KEYCLOAK_ISSUER` (เช่น `https://kc.example.com/realms/auction`), `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`
+
+### ตั้ง Admin คนแรก
 
 ```bash
-bin/setup                   # bundle install + สร้างฐานข้อมูล + รันเซิร์ฟเวอร์
+# login ผ่าน Keycloak 1 ครั้งก่อน เพื่อให้ระบบสร้าง User
+ADMIN_EMAIL=you@example.com bin/rails db:seed
 ```
 
-### 3. รันประจำวัน
+## คำสั่งที่ใช้บ่อย
+
 ```bash
-bin/dev                     # เปิด http://localhost:3000
-bin/rails test              # รัน test
-bin/rubocop                 # ตรวจ code style
+bundle exec rspec                 # รัน test ทั้งหมด
+bundle exec rspec spec/models     # รันเฉพาะโฟลเดอร์
+bin/rubocop                       # lint (bin/rubocop -A เพื่อแก้อัตโนมัติ)
+bin/brakeman --no-pager           # security scan
+bin/bundler-audit                 # ตรวจ gem ที่มีช่องโหว่
+bin/ci                            # รันทุกอย่างเหมือน CI
+bin/dev                           # start server + Tailwind watcher (Procfile.dev)
 ```
 
-## CI
-ทุก Pull Request จะรัน 3 job อัตโนมัติ (ดู `.github/workflows/ci.yml`):
-- **lint** — RuboCop
-- **security** — Brakeman, bundler-audit, importmap audit
-- **test** — test บน PostgreSQL 17
+## Environment variables
+
+ค่า secret ทั้งหมดอ่านจาก ENV หรือ Rails credentials เท่านั้น ดูรายการเต็มใน [.env.example](.env.example)
+
+| ตัวแปร | ใช้ที่ |
+|---|---|
+| `DATABASE_URL` | production (Railway inject ให้) |
+| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD` | dev / test |
+| `KEYCLOAK_ISSUER`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET` | authentication |
+| `APP_URL` (dev) / `APP_HOST`, `RAILWAY_PUBLIC_DOMAIN` (production) | redirect URI, host authorization, mailer |
+| `RAILS_MASTER_KEY` | production |
+| `ACTIVE_STORAGE_SERVICE`, `S3_*` | file storage (production default: `amazon`) |
+| `ADMIN_EMAIL` | `db:seed` |
 
 ## Deploy บน Railway
+
+Keycloak client ของ production ต้องเพิ่ม redirect URI `https://<domain>/users/auth/keycloak/callback`
+
 Railway build จาก `Dockerfile` ตามค่าใน `railway.json` (health check ที่ `/up`)
 ทุกครั้งที่ start server จะรัน `bin/rails db:prepare` อัตโนมัติ ซึ่งสร้าง/migrate ทั้ง primary, cache, queue, cable
 
@@ -65,7 +111,19 @@ Railway build จาก `Dockerfile` ตามค่าใน `railway.json` (he
 | `S3_SECRET_ACCESS_KEY` | `${{Bucket.SECRET_ACCESS_KEY}}` | |
 | `S3_REGION` | `${{Bucket.REGION}}` | |
 | `S3_ENDPOINT` | `${{Bucket.ENDPOINT}}` | |
-| `APP_HOST` | custom domain (ถ้ามี) | `RAILWAY_PUBLIC_DOMAIN` ถูกอนุญาตอัตโนมัติ |
+| `APP_HOST` | custom domain (ถ้ามี) เช่น `auction.example.com` | `RAILWAY_PUBLIC_DOMAIN` ถูกอนุญาตอัตโนมัติ |
+| `KEYCLOAK_ISSUER` | `https://<keycloak>/realms/<realm>` | |
+| `KEYCLOAK_CLIENT_ID` / `KEYCLOAK_CLIENT_SECRET` | จาก Keycloak client | **ห้าม commit** |
+| `MAILER_SENDER` | อีเมลผู้ส่ง | |
 
 > ชื่อ service (`Postgres`, `Bucket`) ใน `${{...}}` ต้องตรงกับชื่อใน Railway project
 > ถ้าใช้ Cloudflare R2 / AWS S3 แทน ให้ใส่ค่า `S3_*` ตรง ๆ
+
+## เอกสาร
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — branch, commit, Pull Request, code review
+- [docs/ROADMAP.md](docs/ROADMAP.md) — milestones M0–M8
+- [docs/coding-standard.md](docs/coding-standard.md)
+- [docs/definition-of-ready.md](docs/definition-of-ready.md) / [docs/definition-of-done.md](docs/definition-of-done.md)
+- [docs/architecture/auction-design.md](docs/architecture/auction-design.md) — การออกแบบการประมูล
+- UI/UX: [Design canvas](https://claude.ai/artifact/QQMiqYfRigdsJ1rj4E4jLn) — แนวทางที่เลือก: **B · Modern marketplace**

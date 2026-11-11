@@ -33,11 +33,13 @@ gem "solid_cable"
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 
-# Deploy this application anywhere as a Docker container [https://kamal-deploy.org]
-gem "kamal", require: false
-
 # Add HTTP asset caching/compression and X-Sendfile acceleration to Puma [https://github.com/basecamp/thruster/]
 gem "thruster", require: false
+
+# Authentication: Devise + Keycloak (OpenID Connect)
+gem "devise"
+gem "omniauth_openid_connect"
+gem "omniauth-rails_csrf_protection"
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 gem "image_processing", "~> 1.2"
@@ -54,6 +56,15 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+  gem "rubocop-rspec", require: false
+  gem "rubocop-rspec_rails", require: false
+
+  # Load .env in development/test
+  gem "dotenv-rails"
+
+  # Testing
+  gem "rspec-rails"
+  gem "factory_bot_rails"
 end
 
 group :development do
@@ -63,8 +74,7 @@ end
 
 group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
-  gem "capybara"
-  gem "selenium-webdriver"
+  gem "shoulda-matchers"
 end
 
 gem "aws-sdk-s3", "~> 1.241", require: false

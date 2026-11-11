@@ -1,37 +1,68 @@
-# แนวทางการทำงานร่วมกัน (Team Workflow)
+# Contributing
 
-## Branch
-- `main` — โค้ดที่พร้อมใช้งาน **ห้าม push ตรง** ต้องผ่าน Pull Request (PR) เท่านั้น
-- แตก branch จาก `main` ตามรูปแบบ:
-  - `feature/<issue-number>-short-name` เช่น `feature/12-place-bid`
-  - `fix/<issue-number>-short-name`
-  - `chore/<short-name>` (config, dependency, docs)
+## Branch strategy
 
-## ขั้นตอนทำงาน 1 งาน
-1. เลือก issue จาก **Issues → Milestones** (milestone ของวันนี้) แล้ว assign ตัวเอง และเปลี่ยน label เป็น `status: doing`
-2. `git checkout main && git pull`
-3. `git checkout -b feature/12-place-bid`
-4. เขียนโค้ด + test → `bin/rails test` และ `bin/rubocop` ต้องผ่าน
-5. Commit (ดูรูปแบบด้านล่าง) แล้ว `git push -u origin feature/12-place-bid`
-6. เปิด PR ไปที่ `main` ใส่ `Closes #12` ในคำอธิบาย → เปลี่ยน label เป็น `status: review`
-7. ให้เพื่อนร่วมทีมอย่างน้อย 1 คน review → CI ผ่าน → Merge (issue ปิดอัตโนมัติ)
+- `main` — โค้ดที่พร้อม deploy เสมอ **ห้าม push ตรง** ทุกการเปลี่ยนแปลงต้องผ่าน Pull Request (PR)
+- สร้าง branch จาก `main` ล่าสุด ตั้งชื่อตามประเภทงานและเลข issue:
 
-## Commit message
+| Prefix | ใช้เมื่อ | ตัวอย่าง |
+|---|---|---|
+| `feature/*` | ฟีเจอร์ใหม่ | `feature/12-seller-create-product` |
+| `fix/*` | แก้ bug | `fix/34-image-limit-off-by-one` |
+| `chore/*` | งาน infra, config, dependency, docs | `chore/groundwork` |
+
+- Branch ควรมีอายุสั้น (≤ 1 Sprint = 1 วัน) ถ้างานใหญ่ให้แตก issue ย่อย
+- ลบ branch หลัง merge
+
+## Commit convention — [Conventional Commits](https://www.conventionalcommits.org/)
+
 ```
-<type>: <สรุปสั้น ๆ>
+<type>(<scope>): <สรุปสั้น ๆ>
 
-type = feat | fix | chore | docs | test | refactor
+[รายละเอียด — ทำไมถึงเปลี่ยน]
+
+Refs #<issue>
 ```
-ตัวอย่าง: `feat: add bid validation for minimum increment`
 
-## Milestone = Sprint ละ 1 วัน
-- แต่ละ milestone คือเป้าหมายของ 1 วันทำงาน ดูภาพรวมที่ [docs/ROADMAP.md](docs/ROADMAP.md)
-- งานที่ไม่เสร็จในวันนั้น ให้ย้ายไป milestone ถัดไป
+- `type`: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, `build`
+- `scope` (ไม่บังคับ): `seller`, `admin`, `auction`, `auth`, `infra`
+- ตัวอย่าง: `feat(seller): validate starting price 1–20,000 baht`
+- Breaking change: ใส่ `!` หลัง type หรือ `BREAKING CHANGE:` ใน footer
+
+## ขั้นตอน Pull Request
+
+1. หยิบ issue ที่มี `status::ready` (ผ่าน [Definition of Ready](docs/definition-of-ready.md)) แล้ว assign ตัวเอง เปลี่ยน label เป็น `status::in-progress`
+2. สร้าง branch → เขียน test + code → รัน `bin/ci` ให้ผ่านในเครื่อง
+3. เปิด PR เข้า `main` ตาม template — ใส่ `Closes #<issue>`, milestone, label
+4. เปลี่ยน label issue เป็น `status::review`
+5. CI (lint, security, test) ต้องเขียวทั้งหมด
+6. ได้ **approval อย่างน้อย 1 คน** (ห้าม approve PR ตัวเอง)
+7. ผู้เปิด PR เป็นคน merge — ใช้ **Squash and merge** โดยชื่อ commit เป็น Conventional Commit
+
+## Code review
+
+ผู้ review ตรวจตาม [Definition of Done](docs/definition-of-done.md) และ:
+
+- ทำตาม Acceptance Criteria ครบทุกข้อ รวม boundary case
+- มี test ครอบคลุม logic ใหม่ และ test มีความหมาย (ไม่ใช่แค่ให้ coverage ขึ้น)
+- ไม่มี secret, token, password ใน code หรือ log
+- ทำตาม [coding standard](docs/coding-standard.md): logic อยู่ใน model/service ไม่ใช่ view/controller
+- Migration ย้อนกลับได้ และมี index/constraint ที่จำเป็น
+
+แนวทาง comment: ใช้ prefix `nit:` (ไม่บังคับแก้), `question:`, `blocker:` (ต้องแก้ก่อน merge) — review โค้ด ไม่ใช่คน
 
 ## Labels
-| กลุ่ม | ค่า |
-|---|---|
-| `type:` | feature, bug, chore, docs |
-| `priority:` | high, medium, low |
-| `area:` | backend, frontend, database, devops |
-| `status:` | todo, doing, review, done |
+
+GitHub ไม่บังคับ scoped label เหมือน GitLab **ให้ใส่ได้ 1 label ต่อ 1 scope** (เช่น มี `priority::high` แล้วห้ามมี `priority::low`)
+
+| Scope | ค่า | ความหมาย |
+|---|---|---|
+| `type::` | feature, bug, chore, docs, spike | ประเภทงาน |
+| `priority::` | high, medium, low | ความสำคัญ |
+| `status::` | ready, in-progress, review, blocked | สถานะใน Sprint |
+| `area::` | seller, admin, auction, infra | ส่วนของระบบ |
+| `roadmap::` | committed, tentative | committed = ทำแน่ใน milestone นี้, tentative = อาจเปลี่ยนหลัง Sprint Review |
+
+## Milestones
+
+M0–M3 คือเส้นทางสู่ Release v0.1 Beta (committed), M4 ขึ้นไปเป็น tentative และ **ลำดับปรับใหม่ทุก Sprint Review**

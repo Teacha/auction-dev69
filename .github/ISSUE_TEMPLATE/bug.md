@@ -1,16 +1,37 @@
 ---
 name: Bug
-about: รายงานบั๊ก
-labels: ["type: bug", "status: todo"]
+about: รายงานปัญหาที่ระบบทำงานไม่ถูกต้อง
+title: "[Bug] "
+labels: ["type::bug"]
 ---
 
-## อาการ (What happened)
+## สรุปปัญหา
 
-## ขั้นตอนการทำซ้ำ (Steps to reproduce)
-1. 
-2. 
+<อธิบายสั้น ๆ ว่าเกิดอะไรขึ้น>
 
-## ผลที่คาดหวัง (Expected)
+## ขั้นตอนทำให้เกิดปัญหา
 
-## Log / Screenshot
+1.
+2.
+3.
 
+## ผลที่คาดหวัง
+
+## ผลที่เกิดขึ้นจริง
+
+## สภาพแวดล้อม
+
+- Environment: <local / staging / production>
+- Browser / อุปกรณ์:
+- ผู้ใช้ / role: <user / admin> (ห้ามใส่ password หรือ token)
+- เวลาที่เกิด (Asia/Bangkok):
+
+## หลักฐาน
+
+<screenshot, log ที่ตัดข้อมูลส่วนตัวออกแล้ว>
+
+## ความรุนแรง
+
+- [ ] ระบบใช้งานไม่ได้ / ข้อมูลเสียหาย / ความปลอดภัย → `priority::high`
+- [ ] ฟีเจอร์หลักใช้งานได้บางส่วน → `priority::medium`
+- [ ] ปัญหาเล็กน้อย / UI → `priority::low`
