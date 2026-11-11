@@ -1,0 +1,13 @@
+{
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "[ruby]": {
+    "editor.defaultFormatter": "Shopify.ruby-lsp",
+    "editor.formatOnSave": true
+  },
+  "rubyLsp.formatter": "rubocop",
+  "rubyLsp.rubyVersionManager": { "identifier": "mise" },
+  "files.associations": { "*.html.erb": "erb" }
+}

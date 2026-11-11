@@ -1,1 +1,129 @@
-# auction-dev69
+# auction-dev69 — ระบบประมูลสินค้าสะสม
+
+ระบบประมูลออนไลน์สำหรับสินค้าสะสม 4 ประเภท: **นาฬิกา, เครื่องประดับ, หนังสือเก่า, ภาพวาด**
+
+- ผู้ใช้ 1 บัญชีเป็นได้ทั้ง **ผู้ขาย** และ **ผู้ประมูล**
+- **Admin** ตรวจสอบและอนุมัติสินค้า แล้วนำไปจัดประมูล
+- วิธีประมูลแรก: **FPSBA** (First-Price Sealed-Bid Auction) — อนาคตรองรับ English, Vickrey, Dutch
+- เป้าหมาย: ขึ้น MVP ให้เร็วที่สุดเพื่อเก็บ feedback (Agile/Scrum, Sprint ละ 1 วัน)
+
+## Tech stack
+
+| ส่วน | เทคโนโลยี |
+|---|---|
+| Language / Framework | Ruby 4.0.9, Rails 8.1 |
+| Database | PostgreSQL 17 |
+| Authentication | Devise + `omniauth_openid_connect` → **Keycloak** (ไม่มี password ในระบบ) |
+| Authorization | `User#role` enum: `user`, `admin` |
+| Frontend | Hotwire (Turbo/Stimulus) + Tailwind CSS |
+| Background jobs | Solid Queue (`SOLID_QUEUE_IN_PUMA=true` บน Railway) |
+| File storage | Active Storage + S3-compatible storage |
+| Test / Lint / Security | RSpec, FactoryBot, shoulda-matchers / RuboCop (omakase + rspec) / Brakeman, bundler-audit |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) |
+| Deploy | [Railway](https://railway.com/) (app + PostgreSQL) |
+
+## Setup เครื่อง (local development)
+
+ต้องมี: [mise](https://mise.jdx.dev/) (หรือ rbenv/asdf), PostgreSQL 17 (Docker หรือ Homebrew), libvips, libpq
+
+```bash
+# 1. Ruby ตาม .ruby-version
+mise install ruby@4.0.9 && mise use ruby@4.0.9
+
+# 2. PostgreSQL สำหรับ dev
+docker compose up -d db                 # แบบ Docker (port 5432, postgres/postgres)
+# หรือ macOS: brew install postgresql@17 && brew services start postgresql@17
+#   แล้วปล่อย DB_HOST/DB_USERNAME/DB_PASSWORD ใน .env ว่าง (ใช้ unix socket)
+
+# 3. Environment variables — ห้าม commit .env
+cp .env.example .env
+# ใส่ค่า KEYCLOAK_* ของ dev realm
+# ขอ config/master.key จากหัวหน้าทีมทางช่องทางส่วนตัว (ห้าม commit)
+
+# 4. ติดตั้ง gem, สร้าง database, start server
+bin/setup
+```
+
+เปิด http://localhost:3000 แล้วกด "เข้าสู่ระบบ" ระบบจะพาไป Keycloak
+
+### ตั้ง Keycloak client (dev)
+
+- Client type: OpenID Connect, Client authentication: **On** (confidential)
+- Valid redirect URIs: `http://localhost:3000/users/auth/keycloak/callback`
+- Valid post logout redirect URIs: `http://localhost:3000/*`
+- ใส่ค่าใน `.env`: `KEYCLOAK_ISSUER` (เช่น `https://kc.example.com/realms/auction`), `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`
+
+### ตั้ง Admin คนแรก
+
+```bash
+# login ผ่าน Keycloak 1 ครั้งก่อน เพื่อให้ระบบสร้าง User
+ADMIN_EMAIL=you@example.com bin/rails db:seed
+```
+
+## คำสั่งที่ใช้บ่อย
+
+```bash
+bundle exec rspec                 # รัน test ทั้งหมด
+bundle exec rspec spec/models     # รันเฉพาะโฟลเดอร์
+bin/rubocop                       # lint (bin/rubocop -A เพื่อแก้อัตโนมัติ)
+bin/brakeman --no-pager           # security scan
+bin/bundler-audit                 # ตรวจ gem ที่มีช่องโหว่
+bin/ci                            # รันทุกอย่างเหมือน CI
+bin/dev                           # start server + Tailwind watcher (Procfile.dev)
+```
+
+## Environment variables
+
+ค่า secret ทั้งหมดอ่านจาก ENV หรือ Rails credentials เท่านั้น ดูรายการเต็มใน [.env.example](.env.example)
+
+| ตัวแปร | ใช้ที่ |
+|---|---|
+| `DATABASE_URL` | production (Railway inject ให้) |
+| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD` | dev / test |
+| `KEYCLOAK_ISSUER`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET` | authentication |
+| `APP_URL` (dev) / `APP_HOST`, `RAILWAY_PUBLIC_DOMAIN` (production) | redirect URI, host authorization, mailer |
+| `RAILS_MASTER_KEY` | production |
+| `ACTIVE_STORAGE_SERVICE`, `S3_*` | file storage (production default: `amazon`) |
+| `ADMIN_EMAIL` | `db:seed` |
+
+## Deploy บน Railway
+
+Keycloak client ของ production ต้องเพิ่ม redirect URI `https://<domain>/users/auth/keycloak/callback`
+
+Railway build จาก `Dockerfile` ตามค่าใน `railway.json` (health check ที่ `/up`)
+ทุกครั้งที่ start server จะรัน `bin/rails db:prepare` อัตโนมัติ ซึ่งสร้าง/migrate ทั้ง primary, cache, queue, cable
+
+### ตั้งค่าครั้งแรก (ใน Railway dashboard)
+1. **New Project → Deploy from GitHub repo** → `carbonformevent-stack/auction-dev69` branch `main`
+2. ใน project เดียวกัน: **+ New → Database → PostgreSQL** และ **+ New → Bucket**
+3. ตั้ง Variables ของ web service ตามตารางด้านล่าง
+4. **Settings → Networking → Generate Domain**
+5. **Settings → Deploy → เปิด "Wait for CI"** เพื่อ deploy เฉพาะ commit ที่ CI ผ่าน
+
+### Environment variables
+| ตัวแปร | ค่า | หมายเหตุ |
+|---|---|---|
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | reference variable — cache/queue/cable ใช้ server เดียวกัน ชื่อ DB ต่อท้าย `_cache`, `_queue`, `_cable` |
+| `RAILS_MASTER_KEY` | เนื้อหาไฟล์ `config/master.key` | **ห้าม commit** |
+| `SOLID_QUEUE_IN_PUMA` | `true` | รัน background job ใน process เดียวกับ web |
+| `S3_BUCKET` | `${{Bucket.BUCKET}}` | Active Storage |
+| `S3_ACCESS_KEY_ID` | `${{Bucket.ACCESS_KEY_ID}}` | |
+| `S3_SECRET_ACCESS_KEY` | `${{Bucket.SECRET_ACCESS_KEY}}` | |
+| `S3_REGION` | `${{Bucket.REGION}}` | |
+| `S3_ENDPOINT` | `${{Bucket.ENDPOINT}}` | |
+| `APP_HOST` | custom domain (ถ้ามี) เช่น `auction.example.com` | `RAILWAY_PUBLIC_DOMAIN` ถูกอนุญาตอัตโนมัติ |
+| `KEYCLOAK_ISSUER` | `https://<keycloak>/realms/<realm>` | |
+| `KEYCLOAK_CLIENT_ID` / `KEYCLOAK_CLIENT_SECRET` | จาก Keycloak client | **ห้าม commit** |
+| `MAILER_SENDER` | อีเมลผู้ส่ง | |
+
+> ชื่อ service (`Postgres`, `Bucket`) ใน `${{...}}` ต้องตรงกับชื่อใน Railway project
+> ถ้าใช้ Cloudflare R2 / AWS S3 แทน ให้ใส่ค่า `S3_*` ตรง ๆ
+
+## เอกสาร
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — branch, commit, Pull Request, code review
+- [docs/ROADMAP.md](docs/ROADMAP.md) — milestones M0–M8
+- [docs/coding-standard.md](docs/coding-standard.md)
+- [docs/definition-of-ready.md](docs/definition-of-ready.md) / [docs/definition-of-done.md](docs/definition-of-done.md)
+- [docs/architecture/auction-design.md](docs/architecture/auction-design.md) — การออกแบบการประมูล
+- UI/UX: [Design canvas](https://claude.ai/artifact/QQMiqYfRigdsJ1rj4E4jLn) — แนวทางที่เลือก: **B · Modern marketplace**

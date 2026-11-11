@@ -1,0 +1,16 @@
+module Users
+  class OmniauthCallbacksController < Devise::OmniauthCallbacksController
+    def keycloak
+      user = User.from_omniauth(request.env["omniauth.auth"])
+      set_flash_message(:notice, :success, kind: "Keycloak") if is_navigational_format?
+      sign_in_and_redirect user, event: :authentication
+    rescue ActiveRecord::RecordInvalid => e
+      Rails.logger.warn("[auth] Keycloak login rejected: #{e.message}")
+      redirect_to new_user_session_path, alert: "ไม่สามารถเข้าสู่ระบบได้: ข้อมูลบัญชีจาก Keycloak ไม่ครบ (ต้องมี email)"
+    end
+
+    def failure
+      redirect_to new_user_session_path, alert: "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
+    end
+  end
+end
